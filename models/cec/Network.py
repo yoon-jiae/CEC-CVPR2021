@@ -58,7 +58,7 @@ class ScaledDotProductAttention(nn.Module):
         self.softmax = nn.Softmax(dim=2)
 
     def forward(self, q, k, v):
-        attn = torch.bmm(q, k.transpose(1, 2))
+        attn = torch.bmm(q, k.transpose(1, 2)) # node j와 다른 모든 node들 사이의 관계 계수를 계산
         attn = attn / self.temperature
         log_attn = F.log_softmax(attn, 2)
         attn = self.softmax(attn)
