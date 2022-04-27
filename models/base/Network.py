@@ -71,7 +71,7 @@ class MYNET(nn.Module):
         if 'ft' in self.args.new_mode:  # further finetune
             self.update_fc_ft(new_fc,data,label,session)
 
-    def update_fc_avg(self,data,label,class_list):
+    def update_fc_avg(self,data,label,class_list): #train data의 embedding avg로 replace함
         new_fc=[]
         for class_index in class_list:
             data_index=(label==class_index).nonzero().squeeze(-1)
@@ -88,7 +88,7 @@ class MYNET(nn.Module):
         elif 'cos' in self.args.new_mode:
             return self.args.temperature * F.linear(F.normalize(x, p=2, dim=-1), F.normalize(fc, p=2, dim=-1))
 
-    def update_fc_ft(self,new_fc,data,label,session):
+    def update_fc_ft(self,new_fc,data,label,session): #finetuning을 하는 update fc
         new_fc=new_fc.clone().detach()
         new_fc.requires_grad=True
         optimized_parameters = [{'params': new_fc}]
