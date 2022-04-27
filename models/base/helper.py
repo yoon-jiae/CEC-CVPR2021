@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 
-def base_train(model, trainloader, optimizer, scheduler, epoch, args):
+def base_train(model, trainloader, optimizer, scheduler, epoch, args): ## 모델 트레이닝 시킴
     tl = Averager()
     ta = Averager()
     model = model.train()
@@ -32,12 +32,12 @@ def base_train(model, trainloader, optimizer, scheduler, epoch, args):
         optimizer.step()
     tl = tl.item()
     ta = ta.item()
-    return tl, ta
+    return tl, ta  ##tl = training loss, ta = training accuracy
 
 
 def replace_base_fc(trainset, transform, model, args):
     # replace fc.weight with the embedding average of train data
-    model = model.eval()
+    model = model.eval() # 학습시킨 모델 불러옴(predict mode)
 
     trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=128,
                                               num_workers=8, pin_memory=True, shuffle=False)
@@ -45,7 +45,7 @@ def replace_base_fc(trainset, transform, model, args):
     embedding_list = []
     label_list = []
     # data_list=[]
-    with torch.no_grad():
+    with torch.no_grad(): # no_grad는 autograd engine을 비활성화시켜 메모리를 줄이고 연산속도를 높임
         for i, batch in enumerate(trainloader):
             data, label = [_.cuda() for _ in batch]
             model.module.mode = 'encoder'
