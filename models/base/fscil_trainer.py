@@ -1,4 +1,4 @@
-from .base import Trainer
+from .base import Trainer #base/base.py
 import os.path as osp
 import torch.nn as nn
 from copy import deepcopy
@@ -16,7 +16,7 @@ class FSCILTrainer(Trainer):
         self.args = set_up_datasets(self.args)
 
         self.model = MYNET(self.args, mode=self.args.base_mode)
-        self.model = nn.DataParallel(self.model, list(range(self.args.num_gpu)))
+        self.model = nn.DataParallel(self.model, list(range(self.args.num_gpu))) #GPU 여러개 씀
         self.model = self.model.cuda()
 
         if self.args.model_dir is not None:
