@@ -22,7 +22,7 @@ class FSCILTrainer(Trainer):
     def set_up_model(self):
         self.model = MYNET(self.args, mode=self.args.base_mode)
         print(MYNET)
-        self.model = nn.DataParallel(self.model, list(range(self.args.num_gpu)))
+        self.model = nn.DataParallel(self.model, list(range(self.args.num_gpu))) #GPU 여러개 씀
         self.model = self.model.cuda()
 
         if self.args.model_dir != None:  #
@@ -158,60 +158,60 @@ class FSCILTrainer(Trainer):
         # init train statistics
         result_list = [args]
 
-        for session in range(args.start_session, args.sessions):
+        for session in range(args.start_session, args.sessions): # session마다 반복
 
-            train_set, trainloader, testloader = self.get_dataloader(session)
+            train_set, trainloader, testloader = self.get_dataloader(session) #data 불러옴
 
-            self.model = self.update_param(self.model, self.best_model_dict)
+            self.model = self.update_param(self.model, self.best_model_dict) # update한 param으로 model 불러옴
 
             if session == 0:  # load base class train img label
 
                 print('new classes for this session:\n', np.unique(train_set.targets))
-                optimizer, scheduler = self.get_optimizer_base()
+                optimizer, scheduler = self.get_optimizer_base() #optimizer와 scheduler 설정
 
-                for epoch in range(args.epochs_base):
-                    start_time = time.time()
+                for epoch in range(args.epochs_base): #epoch 반복
+                    start_time = time.time() # learning time 세기
                     # train base sess
-                    self.model.eval()
-                    tl, ta = self.base_train(self.model, trainloader, optimizer, scheduler, epoch, args)
+                    self.model.eval() #model 불러옴
+                    tl, ta = self.base_train(self.model, trainloader, optimizer, scheduler, epoch, args) # train loss, acc 평가
 
-                    self.model = replace_base_fc(train_set, testloader.dataset.transform, self.model, args)
+                    self.model = replace_base_fc(train_set, testloader.dataset.transform, self.model, args) # fc의 weight를 train data의 embedding average로 대체함
 
-                    self.model.module.mode = 'avg_cos'
+                    self.model.module.mode = 'avg_cos' # 평균 embedding과 cosine classifier 사용
 
                     if args.set_no_val: # set no validation
-                        save_model_dir = os.path.join(args.save_path, 'session' + str(session) + '_max_acc.pth')
-                        torch.save(dict(params=self.model.state_dict()), save_model_dir)
-                        torch.save(optimizer.state_dict(), os.path.join(args.save_path, 'optimizer_best.pth'))
-                        self.best_model_dict = deepcopy(self.model.state_dict())
-                        tsl, tsa = self.test(self.model, testloader, args, session)
+                        save_model_dir = os.path.join(args.save_path, 'session' + str(session) + '_max_acc.pth') # model 저장할 이름 설정
+                        torch.save(dict(params=self.model.state_dict()), save_model_dir) # 모델 저장
+                        torch.save(optimizer.state_dict(), os.path.join(args.save_path, 'optimizer_best.pth')) #optimizer 저장
+                        self.best_model_dict = deepcopy(self.model.state_dict()) # best model의 state dict 저장(parameter 저장)
+                        tsl, tsa = self.test(self.model, testloader, args, session) # test loss, acc 평가
                         self.trlog['test_loss'].append(tsl)
                         self.trlog['test_acc'].append(tsa)
-                        lrc = scheduler.get_last_lr()[0]
+                        lrc = scheduler.get_last_lr()[0] # scheduler 설정
                         print('epoch:%03d,lr:%.4f,training_loss:%.5f,training_acc:%.5f,test_loss:%.5f,test_acc:%.5f' % (
-                            epoch, lrc, tl, ta, tsl, tsa))
+                            epoch, lrc, tl, ta, tsl, tsa)) # 학습 진행 print
                         result_list.append(
                             'epoch:%03d,lr:%.5f,training_loss:%.5f,training_acc:%.5f,test_loss:%.5f,test_acc:%.5f' % (
-                                epoch, lrc, tl, ta, tsl, tsa))
-                    else:
+                                epoch, lrc, tl, ta, tsl, tsa)) # 결과 list에 넣음
+                    else: # validation함
                         # take the last session's testloader for validation
-                        vl, va = self.validation()
+                        vl, va = self.validation() # val loss, acc 평가
 
                         # save better model
-                        if (va * 100) >= self.trlog['max_acc'][session]:
-                            self.trlog['max_acc'][session] = float('%.3f' % (va * 100))
-                            self.trlog['max_acc_epoch'] = epoch
-                            save_model_dir = os.path.join(args.save_path, 'session' + str(session) + '_max_acc.pth')
-                            torch.save(dict(params=self.model.state_dict()), save_model_dir)
-                            torch.save(optimizer.state_dict(), os.path.join(args.save_path, 'optimizer_best.pth'))
-                            self.best_model_dict = deepcopy(self.model.state_dict())
+                        if (va * 100) >= self.trlog['max_acc'][session]: # val acc가 이전의 max acc보다 높으면
+                            self.trlog['max_acc'][session] = float('%.3f' % (va * 100)) # 현재 va를 max acc로 설정
+                            self.trlog['max_acc_epoch'] = epoch # epoch도 저장
+                            save_model_dir = os.path.join(args.save_path, 'session' + str(session) + '_max_acc.pth') # model 저장할 이름 설정
+                            torch.save(dict(params=self.model.state_dict()), save_model_dir) # model 저장
+                            torch.save(optimizer.state_dict(), os.path.join(args.save_path, 'optimizer_best.pth')) # optimizer 저장
+                            self.best_model_dict = deepcopy(self.model.state_dict()) # best model's parameter 저장
                             print('********A better model is found!!**********')
                             print('Saving model to :%s' % save_model_dir)
                         print('best epoch {}, best val acc={:.3f}'.format(self.trlog['max_acc_epoch'],
                                                                           self.trlog['max_acc'][session]))
                         self.trlog['val_loss'].append(vl)
                         self.trlog['val_acc'].append(va)
-                        lrc = scheduler.get_last_lr()[0]
+                        lrc = scheduler.get_last_lr()[0] # scheduler 설정
                         print('epoch:%03d,lr:%.4f,training_loss:%.5f,training_acc:%.5f,val_loss:%.5f,val_acc:%.5f' % (
                             epoch, lrc, tl, ta, vl, va))
                         result_list.append(
@@ -224,18 +224,18 @@ class FSCILTrainer(Trainer):
                     print('This epoch takes %d seconds' % (time.time() - start_time),
                           '\nstill need around %.2f mins to finish' % (
                                   (time.time() - start_time) * (args.epochs_base - epoch) / 60))
-                    scheduler.step()
+                    scheduler.step() # lr 변경
 
                 # always replace fc with avg mean
-                self.model.load_state_dict(self.best_model_dict)
-                self.model = replace_base_fc(train_set, testloader.dataset.transform, self.model, args)
-                best_model_dir = os.path.join(args.save_path, 'session' + str(session) + '_max_acc.pth')
+                self.model.load_state_dict(self.best_model_dict) # best model param 불러옴
+                self.model = replace_base_fc(train_set, testloader.dataset.transform, self.model, args) # fc의 weight를 train data의 embedding average로 대체함
+                best_model_dir = os.path.join(args.save_path, 'session' + str(session) + '_max_acc.pth') # 저장할 model 이름 설정
                 print('Replace the fc with average embedding, and save it to :%s' % best_model_dir)
                 self.best_model_dict = deepcopy(self.model.state_dict())
-                torch.save(dict(params=self.model.state_dict()), best_model_dir)
+                torch.save(dict(params=self.model.state_dict()), best_model_dir) # 모델 저장
 
-                self.model.module.mode = 'avg_cos'
-                tsl, tsa = self.test(self.model, testloader, args, session)
+                self.model.module.mode = 'avg_cos' # 평균 embedding과 cosine classifier 사용
+                tsl, tsa = self.test(self.model, testloader, args, session) # test loss, acc 평가
                 self.trlog['max_acc'][session] = float('%.3f' % (tsa * 100))
                 print('The test acc of base session={:.3f}'.format(self.trlog['max_acc'][session]))
 
@@ -248,7 +248,7 @@ class FSCILTrainer(Trainer):
                 print("training session: [%d]" % session)
                 self.model.load_state_dict(self.best_model_dict)
 
-                self.model.module.mode = self.args.new_mode
+                self.model.module.mode = self.args.new_mode # 설정한 mode로 지정
                 self.model.eval()
                 trainloader.dataset.transform = testloader.dataset.transform
                 self.model.module.update_fc(trainloader, np.unique(train_set.targets), session)
@@ -307,7 +307,7 @@ class FSCILTrainer(Trainer):
 
             k = args.episode_way * args.episode_shot
             proto, query = data[:k], data[k:]
-            # sample low_way data
+            # sample low_way data # incremental data를 sampling함
             proto_tmp = deepcopy(
                 proto.reshape(args.episode_shot, args.episode_way, proto.shape[1], proto.shape[2], proto.shape[3])[
                 :args.low_shot,
@@ -315,7 +315,7 @@ class FSCILTrainer(Trainer):
             query_tmp = deepcopy(
                 query.reshape(args.episode_query, args.episode_way, query.shape[1], query.shape[2], query.shape[3])[:,
                 :args.low_way, :, :, :].flatten(0, 1))
-            # random choose rotate degree
+            # random choose rotate degree # 이미지 회전
             proto_tmp, query_tmp = self.replace_to_rotate(proto_tmp, query_tmp)
 
             model.module.mode = 'encoder'
